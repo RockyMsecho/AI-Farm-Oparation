@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Farm | Operations Dashboard</title>
+<link href="styles.css" rel="stylesheet"/>
+<script>
+    // Blocking, synchronous, and placed in the document head - runs before
+    // the rest of the page even parses, so an unauthenticated visitor never
+    // sees a flash of dashboard content before being sent to the login page.
+    if (!localStorage.getItem("token")) {
+        window.location.replace("./auth.html");
+    }
+</script>
+</head>
+<body>
+<div class="shell">
+<!-- Mobile only (see @media in styles.css). Without this, the whole
+       sidebar - brand, 11 nav items, shift widget, sign out - sits above
+       the actual page content on a phone, so reaching anything meant
+       scrolling past all of it every single time. -->
+<button class="mobile-nav-toggle" id="mobile-nav-toggle" type="button">
+<span class="brand-mark" style="font-size:1.1rem;">🌾</span> AI Farm
+    <span class="mobile-nav-toggle-icon">☰</span>
+</button>
+<aside class="rail" id="rail">
+<div class="rail-brand">
+<div class="brand-mark">🌾</div>
+<div class="brand-text">
+<span class="brand-name">AI Farm</span>
+<span class="brand-sub">Smart Farm Management</span>
+</div>
+</div>
+<label class="farm-select-wrap">
+<span class="farm-select-label">Farm</span>
+<select id="farm-select"></select>
+</label>
+<nav class="tabs" id="tabs">
+<button class="tab-btn active" data-tab="overview"><span class="tab-ico">◆</span>Overview</button>
+<button class="tab-btn" data-tab="farms"><span class="tab-ico">▦</span>Farms &amp; Fields</button><button class="tab-btn" data-tab="structure"><span class="tab-ico">⌂</span> Farm Structure</button>
+<button class="tab-btn" data-tab="crops"><span class="tab-ico">✦</span>Crop Lifecycle</button>
+<button class="tab-btn" data-tab="livestock"><span class="tab-ico">◐</span>Livestock</button>
+<button class="tab-btn" data-tab="inventory"><span class="tab-ico">▣</span>Inventory &amp; Procurement</button>
+<button class="tab-btn" data-tab="tasks"><span class="tab-ico">☑</span>Tasks &amp; Workforce</button>
+<button class="tab-btn" data-tab="users"><span class="tab-ico">◎</span>Users &amp; Roles</button>
+<button class="tab-btn" data-tab="reports"><span class="tab-ico">▤</span>Reports<span class="tab-badge" id="reports-badge" style="display:none;"></span></button>
+<button class="tab-btn" data-tab="help"><span class="tab-ico">?</span> Help &amp; Support</button><button class="tab-btn" data-tab="settings"><span class="tab-ico">⚙</span>Settings</button>
+</nav>
+<div class="rail-footer">
+<div class="sync-pill synced" id="sync-pill">
+<span class="sync-dot"></span>
+<span id="sync-text">Synced</span>
+</div>
+<div class="user-status" id="user-status">
+<span class="user-status-dot"></span>
+<span id="user-status-text">Not signed in</span>
+</div>
+<!-- Shift clock in/out. The backend has fully implemented this
+           (POST /api/shifts/clock-in, /clock-out, GET /api/shifts/current)
+           but nothing in the dashboard used it - see backend.js. -->
+<div class="card shift-card" id="shift-card">
+<div class="shift-status">
+<span class="shift-dot" id="shift-dot"></span>
+<span id="shift-status-text">Checking shift…</span>
+</div>
+<button class="shift-clock-btn" disabled="" id="shift-clock-btn" type="button">…</button>
+</div>
+<button class="logout-btn" id="logout-btn" type="button">Sign out</button>
+</div>
+</aside>
+<main class="main">
+<!-- OVERVIEW -->
+<section class="panel active" id="panel-overview">
+<div class="panel-head">
+<h1>Farm operations overview</h1>
+<p>Everything that needs attention right now, across every module.</p>
+</div>
+<div class="stat-grid" id="stat-grid"></div>
+<div class="card performance-card">
+<div class="card-head">
+<h2>Farm performance at a glance</h2>
+<span class="hint">Live summaries from your crop, livestock, inventory and task records.</span>
+</div>
+<div class="performance-grid">
+  <article class="performance-chart-card">
+    <div class="performance-chart-head">
+      <div><h3>Crop lifecycle</h3><p>Plantings by growth stage</p></div>
+      <span class="chart-live-dot">Live</span>
+    </div>
+    <div class="performance-chart" id="chart-crop-lifecycle" role="img" aria-label="Crop lifecycle chart"></div>
+  </article>
+  <article class="performance-chart-card">
+    <div class="performance-chart-head">
+      <div><h3>Livestock status</h3><p>Current batches by status</p></div>
+      <span class="chart-live-dot">Live</span>
+    </div>
+    <div class="performance-chart" id="chart-livestock-status" role="img" aria-label="Livestock status chart"></div>
+  </article>
+  <article class="performance-chart-card">
+    <div class="performance-chart-head">
+      <div><h3>Task progress</h3><p>Workforce tasks by status</p></div>
+      <span class="chart-live-dot">Live</span>
+    </div>
+    <div class="performance-chart" id="chart-task-progress" role="img" aria-label="Task progress chart"></div>
+  </article>
+  <article class="performance-chart-card">
+    <div class="performance-chart-head">
+      <div><h3>Inventory levels</h3><p>Stock compared with reorder thresholds</p></div>
+      <span class="chart-live-dot">Live</span>
+    </div>
+    <div class="performance-chart" id="chart-inventory-levels" role="img" aria-label="Inventory levels chart"></div>
+  </article>
+</div>
+</div>
+<!-- Real, calculated numbers - not the local demo stat-grid above.
+           Adapts to what the signed-in role can actually see: Owner/Manager
+           get farm-wide counts, Agronomist gets a review queue, Worker/
+           Technician get their own submissions and shift status. -->
+<div class="card" id="snapshot-card">
+<div class="card-head"><h2>Your farm, right now</h2></div>
+<div class="stat-grid" id="snapshot-grid"></div>
+</div>
+<!-- Reviewer/approver only (Owner, Manager, Agronomist) - hidden
+           entirely for Worker/Technician and hidden when nothing needs
+           attention. Filled in by renderNeedsAttentionList() in backend.js. -->
+<div class="card" id="needs-attention-card" style="display:none;">
+<div class="card-head">
+<h2>Needs your attention</h2>
+<button class="chip-x" onclick="goToTab('reports')" type="button">View all in Reports →</button>
+</div>
+<ul class="attention-list" id="needs-attention-list"></ul>
+</div>
+<div class="card" id="critical-card">
+<div class="card-head">
+<h2>🚨 Needs urgent attention</h2>
+<span class="count-chip warn" id="critical-count">0</span>
+</div>
+<p class="hint" style="margin-bottom:0.6rem;">Anything marked critical in any tab shows up here automatically — update the record in its own tab and this list updates with it.</p>
+<ul class="log-list" id="critical-alerts"></ul>
+</div>
+<div class="two-col">
+<div class="card">
+<div class="card-head">
+<h2>Tasks due today</h2>
+<span class="count-chip" id="tasks-count">0</span>
+</div>
+<ul class="task-list" id="tasks-today"></ul>
+<p class="hint" style="margin-top:0.5rem;">Full task board is under Tasks &amp; Workforce.</p>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Notifications &amp; alerts</h2>
+<span class="count-chip warn" id="alerts-count">0</span>
+</div>
+<ul class="alert-list" id="overview-alerts"></ul>
+</div>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Pending approvals &amp; outstanding requests</h2>
+<span class="hint">Purchase requests awaiting sign-off</span>
+</div>
+<ul class="log-list" id="pending-approvals"></ul>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Supplier order status</h2>
+<span class="hint">What's been ordered vs. what's actually arrived</span>
+</div>
+<ul class="log-list" id="supplier-status"></ul>
+</div>
+</section>
+<!-- FARMS & FIELDS (Track A) -->
+<section class="panel" id="panel-farms">
+<div class="panel-head">
+<h1>Farms, fields &amp; access</h1>
+<p>Core farm structure — multi-farm registration, fields/plots, assets, and who has access.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>Your farm</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="farms-table">
+<thead><tr><th>Farm</th><th>Location</th><th>Size</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p class="hint" style="margin-top:0.6rem;">
+          One farm per account, set when the account was registered.
+          To change farm details, an update-farm endpoint isn't built on the
+          backend yet - see docs/DASHBOARD-CONNECTION.md.
+        </p>
+</div>
+<div class="field-grid" id="field-grid"></div>
+
+<form class="inline-form card" id="field-form">
+<h3 class="form-title">Add a field / plot</h3>
+<div class="form-row">
+<select id="field-farm"></select>
+<input id="field-name" placeholder="Field / plot name" required="" type="text"/>
+<input id="field-size" placeholder="Size, e.g. 1.2 ha" required="" type="text"/>
+<input id="field-crop" placeholder="Current crop" required="" type="text"/>
+<input id="field-stage" placeholder="Stage, e.g. Flowering" required="" type="text"/>
+<button type="submit">Add field</button>
+</div>
+</form>
+<div class="card">
+<div class="card-head">
+<h2>Farm assets</h2>
+<span class="hint">Equipment, structures &amp; vehicles</span>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="assets-table">
+<thead><tr><th>Asset</th><th>Type</th><th>Location</th><th>Status</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="asset-form">
+<div class="form-row">
+<input id="asset-name" placeholder="e.g. Tractor A" required="" type="text"/>
+<select id="asset-type">
+<option>Equipment</option>
+<option>Structure</option>
+<option>Vehicle</option>
+<option>Tooling</option>
+</select>
+<input id="asset-location" placeholder="Location" required="" type="text"/>
+<button type="submit">Register asset</button>
+</div>
+</form>
+</div>
+</section><section class="panel" id="panel-structure"><div class="panel-head"><h1>Farm Structure</h1><p>Manage your greenhouses and growing zones. Changes are saved directly to the farm database.</p></div><div class="two-col">
+<div class="card">
+<div class="card-head">
+<h2>Greenhouses</h2>
+<span class="hint">Saved to the backend</span>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="greenhouse-table">
+<thead><tr><th>Name</th><th>Type</th><th>Area</th><th>Location</th><th>Zones</th><th>Status</th></tr></thead>
+<tbody><tr><td class="empty-row" colspan="6">Loading…</td></tr></tbody>
+</table>
+</div>
+<form class="inline-form" id="greenhouse-form" style="margin-top:1rem;">
+<h3 class="form-title" style="width:100%;">Add greenhouse</h3>
+<div class="form-row">
+<input id="greenhouse-name" placeholder="Greenhouse name" required="" type="text"/>
+<input id="greenhouse-type" placeholder="Type, e.g. Tunnel" required="" type="text"/>
+<input id="greenhouse-area" min="0.01" placeholder="Area (m²)" required="" step="0.01" type="number"/>
+<input id="greenhouse-location" placeholder="Location" required="" type="text"/>
+<button type="submit">Add greenhouse</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Growing zones</h2>
+<span class="hint">Linked to a greenhouse</span>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="zone-table">
+<thead><tr><th>Name</th><th>Type</th><th>Area</th><th>Greenhouse</th><th>Status</th><th>ID</th></tr></thead>
+<tbody><tr><td class="empty-row" colspan="6">Loading…</td></tr></tbody>
+</table>
+</div>
+<form class="inline-form" id="zone-form" style="margin-top:1rem;">
+<h3 class="form-title" style="width:100%;">Add growing zone</h3>
+<div class="form-row">
+<input id="zone-name" placeholder="Zone name" required="" type="text"/>
+<input id="zone-type" placeholder="Type, e.g. Growing" type="text"/>
+<input id="zone-area" min="0.01" placeholder="Area (m²)" required="" step="0.01" type="number"/>
+<select id="zone-greenhouse" required=""><option value="">Select greenhouse</option></select>
+<button type="submit">Add zone</button>
+</div>
+</form>
+</div>
+</div><div class="card structure-info-card"><div class="card-head"><h2>How it works</h2></div><p class="hint">Create a greenhouse first, then select it when adding a growing zone. Owners and Managers can create structure records; other roles can view them according to their permissions.</p></div></section>
+<!-- CROP LIFECYCLE (Track B) -->
+<section class="panel" id="panel-crops">
+<div class="panel-head">
+<h1>Crop lifecycle &amp; planning</h1>
+<p>Varieties, planting schedules, growth stages, treatments and harvest records.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>Crop &amp; variety register</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="variety-table">
+<thead><tr><th>Crop</th><th>Variety</th><th>Notes</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="variety-form">
+<div class="form-row">
+<input id="var-crop" placeholder="Crop, e.g. Tomatoes" required="" type="text"/>
+<input id="var-name" placeholder="Variety, e.g. Roma VF" required="" type="text"/>
+<input id="var-notes" placeholder="Notes (optional)" type="text"/>
+<button type="submit">Register</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Growth stage board</h2></div>
+<div class="stage-board" id="stage-board"></div>
+</div>
+<div class="card">
+<div class="card-head"><h2>Planting schedule</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="planting-table">
+<thead>
+<tr><th>Crop</th><th>Field</th><th>Planted</th><th>Expected harvest</th><th>Stage</th><th>Status</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="planting-form">
+<div class="form-row">
+<input id="pl-crop" placeholder="Crop" required="" type="text"/>
+<input id="pl-field" placeholder="Field" required="" type="text"/>
+<input id="pl-planted" required="" type="date"/>
+<input id="pl-harvest" required="" type="date"/>
+<button type="submit">Add planting</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Irrigation, fertilization &amp; treatment log</h2>
+<span class="hint">Every field action, in one log</span>
+</div>
+<ul class="log-list" id="treatment-log"></ul>
+<form class="inline-form" id="treatment-form">
+<div class="form-row">
+<select id="treatment-type">
+<option>Irrigation</option>
+<option>Fertilization</option>
+<option>Pesticide</option>
+<option>Other</option>
+</select>
+<input id="treatment-text" placeholder="e.g. Field 1 — compost top-dressing" required="" type="text"/>
+<input id="treatment-who" placeholder="Logged by" required="" type="text"/>
+<button type="submit">Log entry</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Crop health observations</h2>
+<span class="hint">Agronomist &amp; field scouting notes</span>
+</div>
+<ul class="log-list" id="health-obs-log"></ul>
+<form class="inline-form" id="health-obs-form">
+<div class="form-row">
+<input id="obs-field" placeholder="Field" required="" type="text"/>
+<select id="obs-severity">
+<option value="ok">Normal</option>
+<option value="watch">Watch</option>
+<option value="alert">Critical</option>
+</select>
+<input id="obs-text" placeholder="Observation" required="" type="text"/>
+<input id="obs-who" placeholder="Observed by" required="" type="text"/>
+<button type="submit">Log observation</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Harvest records &amp; yield</h2>
+<span class="hint">Actual yield vs. expected</span>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="harvest-table">
+<thead><tr><th>Crop</th><th>Field</th><th>Harvest date</th><th>Actual yield</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="harvest-form">
+<div class="form-row">
+<input id="hv-crop" placeholder="Crop" required="" type="text"/>
+<input id="hv-field" placeholder="Field" required="" type="text"/>
+<input id="hv-date" required="" type="date"/>
+<input id="hv-qty" min="0" placeholder="Yield" required="" type="number"/>
+<input id="hv-unit" placeholder="Unit, e.g. kg" required="" type="text"/>
+<button type="submit">Record harvest</button>
+</div>
+</form>
+</div>
+</section>
+<!-- LIVESTOCK (Track C) -->
+<section class="panel" id="panel-livestock">
+<div class="panel-head">
+<h1>Livestock &amp; poultry operations</h1>
+<p>Batches, health, vaccinations, feed and production.</p>
+</div>
+<div class="field-grid" id="livestock-grid"></div>
+<form class="inline-form card" id="livestock-form">
+<h3 class="form-title">Register a batch / herd</h3>
+<div class="form-row">
+<input id="ls-name" placeholder="Name, e.g. Layer Hens — Batch C" required="" type="text"/>
+<input id="ls-size" placeholder="Size, e.g. 200 birds" required="" type="text"/>
+<input id="ls-purpose" placeholder="Purpose, e.g. Egg production" required="" type="text"/>
+<input id="ls-stage" placeholder="Stage, e.g. Laying" required="" type="text"/>
+<button type="submit">Add batch</button>
+</div>
+</form>
+<div class="card">
+<div class="card-head"><h2>Health records</h2></div>
+<ul class="log-list" id="livestock-health-log"></ul>
+<form class="inline-form" id="livestock-health-form">
+<input id="lh-batch" placeholder="Batch / herd" required="" type="text"/>
+<input id="lh-text" placeholder="Observation / treatment" required="" type="text"/>
+<input id="lh-who" placeholder="Logged by" required="" type="text"/>
+<button type="submit">Log entry</button>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Breeding records</h2><span class="hint">Mating, pregnancy and birth events</span></div>
+<ul class="log-list" id="breeding-log"></ul>
+<form class="inline-form" id="breeding-form">
+<div class="form-row">
+<input id="br-batch" placeholder="Batch / herd" required type="text"/>
+<select id="br-event"><option>Mating</option><option>Pregnancy confirmed</option><option>Birth</option><option>Weaning</option></select>
+<input id="br-date" required type="date"/>
+<input id="br-notes" placeholder="Notes" type="text"/>
+<button type="submit">Add breeding record</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Vaccination schedule</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="vax-table">
+<thead>
+<tr><th>Batch / Herd</th><th>Vaccine</th><th>Due date</th><th>Status</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="vax-form">
+<div class="form-row">
+<input id="vax-batch" placeholder="Batch / herd" required="" type="text"/>
+<input id="vax-vaccine" placeholder="Vaccine" required="" type="text"/>
+<input id="vax-due" required="" type="date"/>
+<button type="submit">Schedule</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Feed &amp; mortality log</h2></div>
+<ul class="log-list" id="livestock-log"></ul>
+<form class="inline-form" id="livestock-log-form">
+<input id="ls-log-text" placeholder="e.g. 40kg layer mash delivered" required="" type="text"/>
+<input id="ls-log-who" placeholder="Logged by" required="" type="text"/>
+<button type="submit">Log entry</button>
+</form>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Production records</h2>
+<span class="hint">Eggs, milk, or other output</span>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="production-table">
+<thead><tr><th>Batch / Herd</th><th>Metric</th><th>Value</th><th>Date</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="production-form">
+<div class="form-row">
+<input id="prod-batch" placeholder="Batch / herd" required="" type="text"/>
+<input id="prod-metric" placeholder="Metric, e.g. Eggs collected" required="" type="text"/>
+<input id="prod-value" placeholder="Value, e.g. 210" required="" type="text"/>
+<input id="prod-date" required="" type="date"/>
+<button type="submit">Log</button>
+</div>
+</form>
+</div>
+</section>
+<!-- INVENTORY & PROCUREMENT (Track D) -->
+<section class="panel" id="panel-inventory">
+<div class="panel-head">
+<h1>Inventory, procurement &amp; financials</h1>
+<p>Stock levels, suppliers, purchase requests/orders and operating costs.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>Stock levels</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="stock-table">
+<thead>
+<tr><th>Item</th><th>Category</th><th>In stock</th><th>Min. threshold</th><th>Status</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="stock-form">
+<div class="form-row">
+<input id="stock-item" placeholder="Item" required="" type="text"/>
+<input id="stock-cat" placeholder="Category" required="" type="text"/>
+<input id="stock-qty" min="0" placeholder="Quantity" required="" type="number"/>
+<input id="stock-unit" placeholder="Unit, e.g. kg" required="" type="text"/>
+<input id="stock-reorder" min="0" placeholder="Min. threshold" required="" type="number"/>
+<button type="submit">Add item</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Stock usage</h2><span class="hint">Every issue is recorded and deducted from stock</span></div>
+<form class="inline-form" id="stock-usage-form">
+<div class="form-row">
+<input id="usage-item" placeholder="Item name" required type="text"/>
+<input id="usage-qty" min="0.01" placeholder="Quantity used" required type="number" step="0.01"/>
+<input id="usage-unit" placeholder="Unit" required type="text"/>
+<input id="usage-for" placeholder="Used for, e.g. Zone 1" required type="text"/>
+<input id="usage-who" placeholder="Used by" required type="text"/>
+<button type="submit">Record usage</button>
+</div>
+</form>
+<ul class="log-list" id="stock-usage-log"></ul>
+</div>
+<div class="card">
+<div class="card-head"><h2>Suppliers</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="suppliers-table">
+<thead><tr><th>Supplier</th><th>Contact</th><th>Category</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="supplier-form">
+<div class="form-row">
+<input id="sup-name" placeholder="Supplier name" required="" type="text"/>
+<input id="sup-contact" placeholder="Contact (phone/email)" required="" type="text"/>
+<input id="sup-cat" placeholder="Category" required="" type="text"/>
+<button type="submit">Add supplier</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Purchase requests &amp; orders</h2></div>
+<ul class="log-list" id="po-log"></ul>
+<form class="inline-form" id="po-form">
+<div class="form-row">
+<select id="po-type">
+<option>Request</option>
+<option>Order</option>
+</select>
+<input id="po-text" placeholder="e.g. 200kg layer feed from AgriSupply Co." required="" type="text"/>
+<input id="po-who" placeholder="Raised by" required="" type="text"/>
+<button type="submit">Log</button>
+</div>
+</form>
+</div>
+<div class="card" id="finance-card">
+<div class="card-head">
+<h2>Operating costs</h2>
+<span class="hint">Add, edit and export cost records</span>
+</div>
+<div class="stat-grid" id="finance-grid"></div>
+<div class="cost-controls">
+<label class="cost-control-group">
+<span class="cost-control-label">Month</span>
+<select id="cost-month-filter"></select>
+</label>
+<button class="mini-btn-lg" id="cost-download-month">Download month (CSV)</button>
+<label class="cost-control-group">
+<span class="cost-control-label">From</span>
+<input id="cost-range-from" type="date"/>
+</label>
+<label class="cost-control-group">
+<span class="cost-control-label">To</span>
+<input id="cost-range-to" type="date"/>
+</label>
+<button class="mini-btn-lg" id="cost-download-range">Download range (CSV)</button>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="cost-table">
+<thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (R)</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p class="hint" style="margin-top:0.4rem;">Cost records are a locked ledger — once added, an entry can't be edited or removed. This month's costs can be added below; earlier months are download-only.</p>
+<form class="inline-form" id="cost-form">
+<div class="form-row">
+<input id="cost-date" required="" type="date"/>
+<select id="cost-category">
+<option>Inputs</option>
+<option>Labour</option>
+<option>Equipment</option>
+<option>Livestock</option>
+<option>Utilities</option>
+<option>Other</option>
+</select>
+<input id="cost-desc" placeholder="Description" required="" type="text"/>
+<input id="cost-amount" min="0" placeholder="Amount (R)" required="" step="0.01" type="number"/>
+<button id="cost-submit-btn" type="submit">Add cost</button>
+</div>
+</form>
+</div>
+</section>
+<!-- TASKS & WORKFORCE -->
+<section class="panel" id="panel-tasks">
+<div class="panel-head">
+<h1>Tasks &amp; workforce management</h1>
+<p>Assign, prioritize and track daily work across the team.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>All tasks</h2></div>
+<div class="table-scroll">
+<table class="data-table" id="task-table">
+<thead>
+<tr><th>Task</th><th>Linked to</th><th>Assignee</th><th>Priority</th><th>Deadline</th><th>Status</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="full-task-form">
+<div class="form-row">
+<input id="ft-title" placeholder="Task" required="" type="text"/>
+<input id="ft-link" placeholder="Linked to, e.g. Field 3" type="text"/>
+<input id="ft-assignee" placeholder="Assignee" required="" type="text"/>
+<select id="ft-priority">
+<option>Low</option>
+<option selected="">Medium</option>
+<option>High</option>
+</select>
+<input id="ft-deadline" required="" type="date"/>
+<button type="submit">Assign task</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Task history</h2><span class="hint">Recent task assignments and status changes</span></div>
+<ul class="log-list" id="task-history"></ul>
+</div>
+<div class="card">
+<div class="card-head">
+<h2>Log from the field</h2>
+<span class="hint">Works with no signal — queues locally, syncs when back online</span>
+</div>
+<div class="offline-demo">
+<button class="toggle-btn" id="offline-toggle">Offline mode: Off</button>
+<div class="quick-log">
+<select id="ql-field"></select>
+<input id="ql-note" placeholder="e.g. Planting complete, Field 3 / reporting a broken sprinkler" type="text"/>
+<button id="ql-submit">Log entry</button>
+</div>
+<div class="card-head" style="margin-top:1rem;">
+<h3 style="margin:0;font-size:0.95rem;">Queue</h3>
+</div>
+<ul class="log-list" id="offline-queue"></ul>
+</div>
+</div>
+</section>
+<!-- REPORTS -->
+<section class="panel" id="panel-reports">
+<div class="panel-head">
+<h1>Reports &amp; operational records</h1>
+<p>Farm activity history in one place, filterable by type and search.</p>
+</div>
+<!-- ===================================================
+           FIELD REPORTS
+           Workers/Technicians submit; Manager/Owner/Agronomist view all and
+           add a recommendation; Owner/Manager approve it. This is a real
+           security boundary, not just UI hiding - ReportsController enforces
+           the same rules server-side (reports.create / reports.view /
+           reports.recommend / reports.approve), so a Worker calling the API
+           directly still can't reach another user's reports.
+      ==================================================== -->
+<div class="card" id="field-reports-card">
+<div class="card-head">
+<h2>Field reports</h2>
+<span class="hint" id="field-reports-hint">Submitted from the field, reviewed by management</span>
+</div>
+<input class="table-search" id="reports-search" placeholder="Search by name, category or summary…" type="text"/>
+<div class="table-scroll">
+<table class="data-table" id="field-reports-table">
+<thead><tr><th>Submitted by</th><th>Summary</th><th>Recommendation</th><th>Status</th><th></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="field-report-form">
+<h3 class="form-title" style="width:100%;">Submit a report</h3>
+<div class="form-row">
+<select id="field-report-category">
+<option value="Crop">Crop</option>
+<option value="Livestock">Livestock</option>
+<option value="Equipment">Equipment</option>
+<option value="Other">Other</option>
+</select>
+<input id="field-report-summary" placeholder="What did you observe?" required="" style="flex:1;min-width:220px;" type="text"/>
+<button type="submit">Submit</button>
+</div>
+</form>
+</div>
+<!-- ===================================================
+           SHIFT / ATTENDANCE REPORT - real backend data
+      ==================================================== -->
+<div class="card" id="shift-report-card">
+<div class="card-head">
+<h2>Shift &amp; attendance report</h2>
+<span class="hint">Clock in / clock out history</span>
+</div>
+<div class="stat-grid" id="shift-report-stats">
+<div class="stat-card"><div class="stat-label">Hours logged (last 30)</div><div class="stat-value" id="shift-stat-total-hours">0</div></div>
+<div class="stat-card"><div class="stat-label">Currently clocked in</div><div class="stat-value" id="shift-stat-open-count">0</div></div>
+<div class="stat-card"><div class="stat-label">Shifts on record</div><div class="stat-value" id="shift-stat-shift-count">0</div></div>
+</div>
+<div class="row-with-action" style="margin-top:1rem;">
+<h3 class="form-title" style="margin:0;">My shifts</h3>
+<button class="chip-x" id="export-my-shifts-csv" type="button">⬇ Export CSV</button>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="my-shifts-table">
+<thead><tr><th>Clock in</th><th>Clock out</th><th>Hours</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<div id="team-shifts-section" style="display:none;">
+<div class="row-with-action" style="margin-top:1.2rem;">
+<h3 class="form-title" style="margin:0;">Whole team</h3>
+<button class="chip-x" id="export-team-shifts-csv" type="button">⬇ Export CSV</button>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="team-shifts-table">
+<thead><tr><th>User</th><th>Clock in</th><th>Clock out</th><th>Hours</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="report-filters">
+<select id="report-type-filter">
+<option value="all">All types</option>
+<option value="Treatment">Irrigation / Fertilization / Treatment</option>
+<option value="Health observation">Crop health observation</option>
+<option value="Harvest">Harvest</option>
+<option value="Livestock health">Livestock health</option>
+<option value="Production">Production</option>
+<option value="Feed/mortality">Feed &amp; mortality</option>
+<option value="Procurement">Procurement</option>
+<option value="Task">Task</option>
+</select>
+<input id="report-search" placeholder="Search records…" type="text"/>
+</div>
+<div class="table-scroll">
+<table class="data-table" id="report-table">
+<thead><tr><th>Type</th><th>Details</th><th>By</th><th>When</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- USERS & ROLES (moved out of Settings - this is core, frequent work, not a settings screen) -->
+<section class="panel" id="panel-users">
+<div class="panel-head">
+<h1>Users &amp; roles</h1>
+<p>Who has access to this farm, and what they can do.</p>
+</div>
+<div class="card" id="team-access-card">
+<div class="card-head">
+<h2>Users &amp; access</h2>
+<span class="hint">Role-based permissions, per farm</span>
+</div>
+<input class="table-search" id="team-search" placeholder="Search by name, email or role…" type="text"/>
+<div class="table-scroll">
+<table class="data-table" id="team-table">
+<thead>
+<tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<form class="inline-form" id="team-form">
+<h3 class="form-title" style="width:100%;">Add a staff account</h3>
+<div class="form-row">
+<input id="team-name" placeholder="Full name" required="" type="text"/>
+<input id="team-email" placeholder="Email" required="" type="email"/>
+<input id="team-mobile" placeholder="Mobile" required="" type="tel"/>
+<select id="team-role" required="">
+<option value="">Select role</option>
+<option value="Worker">Worker</option>
+<option value="Agronomist">Agronomist</option>
+<option value="Technician">Technician</option>
+</select>
+<input id="team-password" minlength="8" placeholder="Temporary password" required="" type="password"/>
+<button type="submit">Add user</button>
+</div>
+<p class="hint" style="margin-top:0.5rem;">
+            Only Worker, Agronomist and Technician can be created here.
+            Owner and Manager accounts are created through registration or by
+            promoting an existing user's role below.
+          </p>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>What each role can do</h2></div>
+<div class="table-scroll">
+<table class="data-table">
+<thead><tr><th>Role</th><th>Zones</th><th>Users</th><th>Reports</th><th>Shift report</th></tr></thead>
+<tbody>
+<tr><td><span class="badge role">Owner</span></td><td>Full access</td><td>Full access</td><td>View + approve/reject</td><td>Own + team</td></tr>
+<tr><td><span class="badge role">Manager</span></td><td>Create / edit</td><td>Add / manage</td><td>View + approve/reject</td><td>Own + team</td></tr>
+<tr><td><span class="badge role">Agronomist</span></td><td>View only</td><td>—</td><td>View + recommend</td><td>Own only</td></tr>
+<tr><td><span class="badge role">Worker / Technician</span></td><td>View only</td><td>—</td><td>Submit own</td><td>Own only</td></tr>
+</tbody>
+</table>
+</div>
+<p class="hint" style="margin-top:0.6rem;">
+          Every row in this table is enforced by the backend, not just this
+          page: Zones and Users were the first to get real permission checks,
+          and Reports and the shift team-report followed the same pattern
+          (<code>reports.*</code> and <code>shifts.viewTeam</code> in the
+          RBAC permission table). A request outside these rules is rejected
+          by the API itself, regardless of what this page shows.
+        </p>
+</div>
+<div class="card" id="role-permissions-card">
+<div class="card-head">
+<h2>Manage role permissions</h2>
+<span class="hint">Owner only</span>
+</div>
+<p class="hint">Choose a role and control exactly which backend permissions it receives. Changes are stored in the RolePermissions table and take effect for that role after users sign in again.</p>
+<div class="form-row role-permission-toolbar">
+<select id="permission-role-select" aria-label="Role to edit">
+<option value="">Select role</option>
+</select>
+<button type="button" id="load-role-permissions-btn">Load permissions</button>
+</div>
+<div id="role-permissions-editor" class="permission-editor" hidden>
+<div id="role-permissions-list" class="permission-list"></div>
+<div class="permission-actions">
+<button type="button" id="save-role-permissions-btn">Save permissions</button>
+<span id="role-permissions-status" class="hint"></span>
+</div>
+</div>
+</div>
+</section>
+<!-- SETTINGS -->
+<section class="panel" id="panel-help"><div class="panel-head"><h1>Help &amp; Support</h1><p>Quick guidance for using AI Farm and troubleshooting the connection.</p></div><div class="card help-card"><div class="card-head"><h2>Getting started</h2></div><ul class="help-list"><li>Sign in with your farm account.</li><li>Open Farm Structure to add Greenhouses and Growing Zones.</li><li>Use Users &amp; Roles to add staff and manage access.</li><li>Use Reports and Operations modules to record farm activity.</li></ul></div><div class="card help-card"><div class="card-head"><h2>If the server cannot be reached</h2></div><ul class="help-list"><li>Make sure the ASP.NET Core backend is running on https://localhost:5226.</li><li>Open https://localhost:5226/auth.html instead of opening the HTML file directly.</li><li>If Chrome shows a certificate warning, run the included TRUST-HTTPS-CERTIFICATE.ps1 script once.</li><li>If the API still fails, open https://localhost:5226/swagger to confirm the backend is running.</li></ul></div><div class="card help-card"><div class="card-head"><h2>Access &amp; permissions</h2></div><ul class="help-list"><li>Owner and Manager can manage farm structure.</li><li>Workers, Technicians and Agronomists can only perform actions allowed by their backend permissions.</li><li>Changing what is visible in the dashboard does not replace backend authorization.</li></ul></div></section><section class="panel" id="panel-settings">
+<div class="panel-head">
+<h1>Settings</h1>
+<p>Your account, and how this dashboard behaves for you.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>Your account</h2></div>
+<dl class="account-details">
+<div><dt>Name</dt><dd id="settings-name">—</dd></div>
+<div><dt>Email</dt><dd id="settings-email">—</dd></div>
+<div><dt>Role</dt><dd id="settings-role">—</dd></div>
+<div><dt>Farm</dt><dd id="settings-farm">—</dd></div>
+</dl>
+</div>
+<div class="card">
+<div class="card-head"><h2>Change password</h2></div>
+<div class="hint" id="password-banner"></div>
+<form class="inline-form" id="change-password-form">
+<div class="form-row">
+<input id="current-password" placeholder="Current password" required="" type="password"/>
+<input id="new-password" minlength="8" placeholder="New password (min 8 characters)" required="" type="password"/>
+<input id="confirm-new-password" minlength="8" placeholder="Confirm new password" required="" type="password"/>
+<button type="submit">Update password</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-head"><h2>Preferences</h2></div>
+<label class="pref-row">
+<input id="pref-compact-tables" type="checkbox"/>
+<span>Compact tables (tighter row spacing)</span>
+</label>
+<label class="pref-row">
+<input checked="" id="pref-low-stock-alerts" type="checkbox"/>
+<span>Highlight low-stock items on the Overview tab</span>
+</label>
+<p class="hint">Saved on this device only - not sent to the backend.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>About</h2></div>
+<p class="hint">AI Farm dashboard, connected to your farm's own backend over HTTPS.</p>
+</div>
+<div class="card">
+<div class="card-head"><h2>Legal</h2></div>
+<p class="hint" style="margin-bottom:0.7rem;">How your account and farm data are handled.</p>
+<a class="chip-x" href="privacy-policy.html" style="display:inline-block;text-decoration:none;">📄 Privacy Policy</a>
+</div>
+</section>
+</main>
+</div>
+<!-- Toast notifications - replaces alert() for form errors/success across
+     the connected tabs (Users, Reports, Shifts). See showToast() in
+     backend.js. -->
+<div aria-live="polite" class="toast-stack" id="toast-stack"></div>
+<script src="script.js"></script>
+<script src="backend.js"></script>
+</body>
+</html>

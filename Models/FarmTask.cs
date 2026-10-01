@@ -1,0 +1,2 @@
+namespace FarmManagement.API.Models;
+public class FarmTask { public int Id { get; set; } public int FarmId { get; set; } public Farm? Farm { get; set; } public string Title { get; set; } = ""; public string Link { get; set; } = ""; public string Assignee { get; set; } = ""; public string Priority { get; set; } = "Medium"; public DateTime Deadline { get; set; } public string Status { get; set; } = "Pending"; public DateTime CreatedAt { get; set; } = DateTime.UtcNow; public DateTime? CompletedAt { get; set; } }

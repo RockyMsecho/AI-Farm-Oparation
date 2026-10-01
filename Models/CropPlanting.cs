@@ -1,0 +1,2 @@
+namespace FarmManagement.API.Models;
+public class CropPlanting { public int Id { get; set; } public int FarmId { get; set; } public Farm? Farm { get; set; } public string Crop { get; set; } = ""; public string Field { get; set; } = ""; public DateTime Planted { get; set; } public DateTime ExpectedHarvest { get; set; } public string Stage { get; set; } = "Germination"; public string Status { get; set; } = "ok"; }

@@ -1,0 +1,2 @@
+namespace FarmManagement.API.Models;
+public class InventoryUsage { public int Id { get; set; } public int FarmId { get; set; } public Farm? Farm { get; set; } public string Item { get; set; } = ""; public decimal Quantity { get; set; } public string Unit { get; set; } = ""; public string UsedFor { get; set; } = ""; public string Who { get; set; } = ""; public DateTime CreatedAt { get; set; } = DateTime.UtcNow; }

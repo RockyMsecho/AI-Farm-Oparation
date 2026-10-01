@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Farm | Page not found</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .notfound-shell{
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:2rem;position:relative;z-index:1;
+  }
+  .notfound-mark{font-size:2.6rem;margin-bottom:0.6rem;}
+  .notfound-code{
+    font-size:4.5rem;font-weight:800;line-height:1;
+    background:linear-gradient(135deg,var(--emerald-primary),var(--emerald-bright));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .notfound-shell h1{font-size:1.2rem;margin-top:0.6rem;}
+  .notfound-shell p{color:var(--text-muted);font-size:0.88rem;margin-top:0.5rem;max-width:40ch;}
+  .notfound-actions{display:flex;gap:0.7rem;margin-top:1.8rem;flex-wrap:wrap;justify-content:center;}
+  .notfound-actions a{
+    padding:0.7rem 1.2rem;border-radius:9px;font-size:0.85rem;font-weight:700;
+    text-decoration:none;
+  }
+  .notfound-primary{
+    background:linear-gradient(135deg,var(--emerald-primary),var(--emerald-bright));color:#02150e;
+  }
+  .notfound-secondary{
+    border:1px solid var(--card-border);color:var(--text-main);background:rgba(255,255,255,0.03);
+  }
+</style>
+</head>
+<body>
+
+<div class="notfound-shell">
+  <div class="notfound-mark">🌾</div>
+  <div class="notfound-code">404</div>
+  <h1>This field doesn't exist.</h1>
+  <p>The page you're looking for was moved, renamed, or never planted here to begin with.</p>
+
+  <div class="notfound-actions">
+    <a href="#" id="notfound-primary-link" class="notfound-primary">Go to dashboard</a>
+    <a href="auth.html" class="notfound-secondary">Sign in</a>
+  </div>
+</div>
+
+<script>
+  // If there's a token, send them to the dashboard - it's a page they can
+  // actually use. If not, "go to dashboard" would just bounce them straight
+  // back here via index.html's own auth guard, so send them to sign in
+  // directly instead.
+  var primaryLink = document.getElementById("notfound-primary-link");
+  var hasToken = !!localStorage.getItem("token");
+  primaryLink.href = hasToken ? "index.html" : "auth.html";
+  primaryLink.textContent = hasToken ? "Go to dashboard" : "Go to sign in";
+</script>
+
+</body>
+</html>

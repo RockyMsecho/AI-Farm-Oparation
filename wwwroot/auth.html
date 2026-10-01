@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Farm | Sign In</title>
+<link href="styles.css" rel="stylesheet"/>
+<link href="auth.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="auth-shell">
+<section class="auth-brand"><div class="rail-brand auth-mini-brand"><div class="brand-mark">🌾</div><div class="brand-text"><span class="brand-name">AI Farm</span><span class="brand-sub">Smart Farm Management</span></div></div><div class="auth-visual"><div class="auth-orbit auth-orbit-one"><div class="auth-orbit auth-orbit-two"></div><div class="auth-visual-core"><div class="auth-leaf">🌱</div></div></div><div class="auth-visual-badge">SMART FARM MANAGEMENT</div><h1 class="auth-headline">Run the farm.<br/>See the bigger picture.</h1><p class="auth-sub">One secure workspace for your farm structure, people, operations and insights.</p><div class="auth-chips"><span class="auth-chip">Farm Structure</span><span class="auth-chip">Team &amp; Roles</span><span class="auth-chip">Operations</span></div><div class="auth-secure">●  Secure access  ·  HTTPS  ·  JWT</div></div></section>
+<section class="auth-panel">
+<div class="card auth-card">
+<div class="tabs auth-tabs" role="tablist">
+<button aria-selected="true" class="tab-btn active" id="tabLogin" role="tab" type="button">Sign In</button>
+<button aria-selected="false" class="tab-btn" id="tabRegister" role="tab" type="button">Create Farm Account</button>
+</div>
+<div class="auth-banner" id="banner"></div>
+<!-- ===================== LOGIN ===================== -->
+<form class="auth-form active" id="loginForm" novalidate="">
+<div class="auth-field">
+<label for="loginEmail">Email</label>
+<input autocomplete="username" id="loginEmail" placeholder="you@yourfarm.com" required="" type="email"/>
+</div>
+<div class="auth-field">
+<label for="loginPassword">Password</label>
+<div class="auth-password-wrap">
+<input autocomplete="current-password" id="loginPassword" placeholder="••••••••" required="" type="password"/>
+<button aria-label="Show password" class="auth-peek" data-target="loginPassword" type="button">👁</button>
+</div>
+</div>
+<div class="auth-row-between">
+<label class="auth-remember">
+<input id="rememberMe" type="checkbox"/>
+<span>Remember me</span>
+</label>
+<a href="#" id="forgotPassword">Forgot password?</a>
+</div>
+<button class="auth-submit" id="loginSubmit" type="submit">
+<span class="auth-btn-label">Sign In</span>
+<span aria-hidden="true" class="auth-btn-spinner"></span>
+</button>
+</form>
+<!-- ===================== REGISTER ===================== -->
+<form class="auth-form" id="registerForm" novalidate="">
+<p class="auth-note">
+                    This creates the first <strong>Owner</strong> account for your
+                    farm on AI Farm. Add Managers, Workers, Agronomists and
+                    Technicians afterward from the Settings tab.
+                </p>
+<div class="auth-grid">
+<div class="auth-field">
+<label for="regFullName">Full name</label>
+<input id="regFullName" placeholder="Jane Dlamini" required="" type="text"/>
+</div>
+<div class="auth-field">
+<label for="regEmail">Email</label>
+<input id="regEmail" placeholder="you@yourfarm.com" required="" type="email"/>
+</div>
+<div class="auth-field">
+<label for="regMobile">Mobile</label>
+<input id="regMobile" placeholder="+27 82 000 0000" required="" type="tel"/>
+</div>
+<div class="auth-field">
+<label for="regPassword">Password</label>
+<div class="auth-password-wrap">
+<input id="regPassword" minlength="8" placeholder="At least 8 characters" required="" type="password"/>
+<button aria-label="Show password" class="auth-peek" data-target="regPassword" type="button">👁</button>
+</div>
+</div>
+<div class="auth-field">
+<label for="regConfirmPassword">Confirm password</label>
+<div class="auth-password-wrap">
+<input id="regConfirmPassword" minlength="8" placeholder="Repeat password" required="" type="password"/>
+<button aria-label="Show password" class="auth-peek" data-target="regConfirmPassword" type="button">👁</button>
+</div>
+</div>
+<div class="auth-field span-2"><hr class="auth-divider"/></div>
+<div class="auth-field span-2">
+<label for="regFarmName">Farm name</label>
+<input id="regFarmName" placeholder="e.g. Riverside Farm" required="" type="text"/>
+</div>
+<div class="auth-field">
+<label for="regFarmLocation">Location</label>
+<input id="regFarmLocation" placeholder="Limpopo, South Africa" required="" type="text"/>
+</div>
+<div class="auth-field">
+<label for="regFarmType">Farm type</label>
+<select id="regFarmType" required="">
+<option value="">Select type</option>
+<option>Crop Farming</option>
+<option>Livestock Farming</option>
+<option>Mixed Farming</option>
+<option>Greenhouse Farming</option>
+<option>Poultry Farming</option>
+<option>Aquaculture</option>
+<option>Other</option>
+</select>
+</div>
+<div class="auth-field">
+<label for="regFarmArea">Farm area</label>
+<input id="regFarmArea" min="0" placeholder="e.g. 12.5" required="" step="0.01" type="number"/>
+</div>
+<div class="auth-field">
+<label for="regAreaUnit">Area unit</label>
+<select id="regAreaUnit" required="">
+<option value="">Select unit</option>
+<option>Hectares</option>
+<option>Acres</option>
+</select>
+</div>
+<div class="auth-field span-2">
+<label for="regPrimaryCrop">Primary crop</label>
+<input id="regPrimaryCrop" placeholder="e.g. Maize, Tomatoes" required="" type="text"/>
+</div>
+</div>
+<button class="auth-submit" id="registerSubmit" type="submit">
+<span class="auth-btn-label">Create Account</span>
+<span aria-hidden="true" class="auth-btn-spinner"></span>
+</button>
+</form>
+</div>
+<p class="auth-conn">Growing smarter, one farm at a time.</p>
+</section>
+</div>
+<script src="auth.js"></script>
+</body>
+</html>
